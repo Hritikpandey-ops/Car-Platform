@@ -1,0 +1,26 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: yourpassword
+      POSTGRES_DB: auth_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./auth-service/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+
+  auth-service:
+    build: ./auth-service
+    ports:
+      - "8081:8081"
+    env_file:
+      - ./auth-service/.env
+    depends_on:
+      - postgres
+
+volumes:
+  pgdata:

@@ -1,0 +1,19 @@
+# Go build files
+*.exe
+*.out
+*.test
+
+# Dependency directories
+vendor/
+
+# Environment variables
+.env
+
+# Logs
+*.log
+
+# Docker volumes
+pgdata/
+
+# OS-specific
+.DS_Store

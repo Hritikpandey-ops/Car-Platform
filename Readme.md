@@ -75,3 +75,19 @@ Test API Endpoints using Postman
 ## GET /verify?token=...
 ## POST /login
 ## GET /api/me (with JWT)
+
+## Next Up
+Plan is to add more microservices like:
+
+ vehicle-service
+
+ media-service (upload car photos)
+
+ valuation-service (estimate car value)
+
+ Admin & verification dashboards
+
+
+## Author
+Hritik Pandey
+GitHub: @Hritikpandey-ops

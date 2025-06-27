@@ -1,26 +1,26 @@
 package main
 
 import (
-	"log"
-
-	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
-
 	"github.com/Hritikpandey-ops/vehicle-service/database"
 	"github.com/Hritikpandey-ops/vehicle-service/handlers"
+	middlewares "github.com/Hritikpandey-ops/vehicle-service/middleware"
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("No .env file found")
-	}
 
 	database.Connect()
+	r := gin.Default()
 
-	router := gin.Default()
-	router.POST("/vehicles", handlers.CreateVehicle)
-	router.GET("/vehicles", handlers.GetVehicles)
+	r.Use(gin.Logger(), gin.Recovery())
 
-	router.Run(":8082")
+	// Protected Routes
+	protected := r.Group("/")
+	protected.Use(middlewares.AuthMiddleware())
+	{
+		protected.POST("/vehicles", handlers.CreateVehicle)
+		protected.GET("/vehicles", handlers.GetVehicles)
+	}
+
+	r.Run(":8082")
 }

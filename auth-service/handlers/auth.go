@@ -99,3 +99,88 @@ func Login(c *gin.Context) {
 
 	c.JSON(http.StatusOK, gin.H{"token": token})
 }
+
+// Get all users
+func GetAllUsers(c *gin.Context) {
+	rows, err := database.DB.Query(`SELECT id, email, is_verified FROM users`)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to fetch users"})
+		return
+	}
+	defer rows.Close()
+
+	var users []models.User
+	for rows.Next() {
+		var user models.User
+		if err := rows.Scan(&user.ID, &user.Email, &user.IsVerified); err != nil {
+			continue
+		}
+		users = append(users, user)
+	}
+	c.JSON(200, users)
+}
+
+// Get user by ID
+func GetUserByID(c *gin.Context) {
+	id := c.Param("id")
+	var user models.User
+	err := database.DB.QueryRow(`SELECT id, email, is_verified FROM users WHERE id=$1`, id).Scan(
+		&user.ID, &user.Email, &user.IsVerified)
+	if err != nil {
+		c.JSON(404, gin.H{"error": "User not found"})
+		return
+	}
+	c.JSON(200, user)
+}
+
+// Update user
+func UpdateUser(c *gin.Context) {
+	id := c.Param("id")
+	var input struct {
+		Email      string `json:"email"`
+		IsVerified bool   `json:"is_verified"`
+	}
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(400, gin.H{"error": "Invalid input"})
+		return
+	}
+
+	_, err := database.DB.Exec(`UPDATE users SET email=$1, is_verified=$2 WHERE id=$3`, input.Email, input.IsVerified, id)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to update user"})
+		return
+	}
+	c.JSON(200, gin.H{"message": "User updated"})
+}
+
+// Delete user
+func DeleteUser(c *gin.Context) {
+	id := c.Param("id")
+	_, err := database.DB.Exec(`DELETE FROM users WHERE id=$1`, id)
+	if err != nil {
+		c.JSON(500, gin.H{"error": "Failed to delete user"})
+		return
+	}
+	c.JSON(200, gin.H{"message": "User deleted"})
+}
+
+// Search users (by email)
+func SearchUsers(c *gin.Context) {
+	query := c.Query("q")
+	rows, err := database.DB.Query("SELECT id, email, is_verified FROM users WHERE email ILIKE '%' || $1 || '%'", query)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search users"})
+		return
+	}
+	defer rows.Close()
+
+	var users []models.User
+	for rows.Next() {
+		var user models.User
+		if err := rows.Scan(&user.ID, &user.Email, &user.IsVerified); err != nil {
+			continue
+		}
+		users = append(users, user)
+	}
+	c.JSON(http.StatusOK, users)
+}

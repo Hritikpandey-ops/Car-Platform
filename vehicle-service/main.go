@@ -8,18 +8,20 @@ import (
 )
 
 func main() {
-
 	database.Connect()
 	r := gin.Default()
 
 	r.Use(gin.Logger(), gin.Recovery())
 
-	// Protected Routes
 	protected := r.Group("/")
 	protected.Use(middlewares.AuthMiddleware())
 	{
 		protected.POST("/vehicles", handlers.CreateVehicle)
 		protected.GET("/vehicles", handlers.GetVehicles)
+		protected.GET("/vehicles/:id", handlers.GetVehicleByID)
+		protected.PUT("/vehicles/:id", handlers.UpdateVehicle)
+		protected.DELETE("/vehicles/:id", handlers.DeleteVehicle)
+		protected.GET("/vehicles/search", handlers.SearchVehicles)
 	}
 
 	r.Run(":8082")

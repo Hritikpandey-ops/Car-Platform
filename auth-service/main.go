@@ -22,7 +22,7 @@ func main() {
 	r.POST("/login", handlers.Login)
 	r.GET("/verify", handlers.VerifyEmail)
 
-	// 🔒 Protected route with JWT middleware
+	// Protected route with JWT middleware
 	api := r.Group("/api")
 	api.Use(middlewares.AuthMiddleware())
 	{
@@ -30,6 +30,12 @@ func main() {
 			email, _ := c.Get("email")
 			c.JSON(200, gin.H{"message": "Authenticated", "email": email})
 		})
+
+		api.GET("/users", handlers.GetAllUsers)
+		api.GET("/users/:id", handlers.GetUserByID)
+		api.PUT("/users/:id", handlers.UpdateUser)
+		api.DELETE("/users/:id", handlers.DeleteUser)
+		api.GET("/users/search", handlers.SearchUsers)
 	}
 
 	// Start server

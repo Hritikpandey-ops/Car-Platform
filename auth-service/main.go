@@ -6,10 +6,15 @@ import (
 	"github.com/Hritikpandey-ops/auth-service/database"
 	"github.com/Hritikpandey-ops/auth-service/handlers"
 	middlewares "github.com/Hritikpandey-ops/auth-service/middleware"
+	"github.com/Hritikpandey-ops/auth-service/utils"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
+
+	utils.InitLogger()
+	utils.Log.Info("Starting Auth Service...")
+
 	// Initialize the database
 	if err := database.InitDB(); err != nil {
 		panic("Failed to connect to DB: " + err.Error())
@@ -32,12 +37,17 @@ func main() {
 			c.JSON(200, gin.H{"message": "Authenticated", "email": email})
 		})
 
-		api.PUT("/users/:id/promote", handlers.PromoteToAdmin)
-		api.GET("/users", handlers.GetAllUsers)
 		api.GET("/users/:id", handlers.GetUserByID)
-		api.PUT("/users/:id", handlers.UpdateUser)
+		api.PATCH("/users/:id", handlers.UpdateUser)
 		api.DELETE("/users/:id", handlers.DeleteUser)
 		api.GET("/users/search", handlers.SearchUsers)
+	}
+
+	adminRoutes := api.Group("/admin")
+	adminRoutes.Use(middlewares.AdminOnly())
+	{
+		adminRoutes.GET("/users", handlers.GetAllUsers)
+		adminRoutes.PUT("/users/:id/promote", handlers.PromoteToAdmin)
 	}
 
 	// Start server

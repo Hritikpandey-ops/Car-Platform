@@ -3,9 +3,7 @@ package handlers
 import (
 	"database/sql"
 	"fmt"
-	"log"
 	"net/http"
-	"strings"
 
 	"github.com/Hritikpandey-ops/auth-service/models"
 	"github.com/Hritikpandey-ops/auth-service/utils"
@@ -131,7 +129,7 @@ func GetAllUsers(c *gin.Context) {
 	for rows.Next() {
 		var user models.User
 		if err := rows.Scan(&user.ID, &user.Email, &user.IsVerified, &user.Role); err != nil {
-			log.Println("Scan error:", err)
+			utils.Log.WithError(err).Error("Failed to Get user row")
 			continue
 		}
 		users = append(users, user)
@@ -172,32 +170,50 @@ func UpdateUser(c *gin.Context) {
 		return
 	}
 
+	// Validate role if provided
+	if input.Role != nil {
+		validRoles := map[string]bool{"user": true, "admin": true}
+		if !validRoles[*input.Role] {
+			c.JSON(400, gin.H{"error": "Invalid role"})
+			return
+		}
+	}
+
+	// Build the SQL dynamically
 	query := "UPDATE users SET"
-	params := []interface{}{}
-	paramIndex := 1
+	args := []interface{}{}
+	i := 1
 
 	if input.Email != nil {
-		query += fmt.Sprintf(" email=$%d,", paramIndex)
-		params = append(params, *input.Email)
-		paramIndex++
+		query += fmt.Sprintf(" email=$%d,", i)
+		args = append(args, *input.Email)
+		i++
 	}
 	if input.IsVerified != nil {
-		query += fmt.Sprintf(" is_verified=$%d,", paramIndex)
-		params = append(params, *input.IsVerified)
-		paramIndex++
+		query += fmt.Sprintf(" is_verified=$%d,", i)
+		args = append(args, *input.IsVerified)
+		i++
 	}
 	if input.Role != nil {
-		query += fmt.Sprintf(" role=$%d,", paramIndex)
-		params = append(params, *input.Role)
-		paramIndex++
+		query += fmt.Sprintf(" role=$%d,", i)
+		args = append(args, *input.Role)
+		i++
 	}
 
-	query = strings.TrimSuffix(query, ",")
-	query += fmt.Sprintf(" WHERE id=$%d", paramIndex)
-	params = append(params, id)
+	// Remove trailing comma
+	if len(args) == 0 {
+		c.JSON(400, gin.H{"error": "No fields to update"})
+		return
+	}
+	query = query[:len(query)-1]
 
-	_, err := database.DB.Exec(query, params...)
+	// Add WHERE clause
+	query += fmt.Sprintf(" WHERE id=$%d", i)
+	args = append(args, id)
+
+	_, err := database.DB.Exec(query, args...)
 	if err != nil {
+		utils.Log.WithError(err).Error("Failed to update user")
 		c.JSON(500, gin.H{"error": "Failed to update user"})
 		return
 	}

@@ -15,6 +15,8 @@ CREATE TABLE users (
   verification_token TEXT
 );
 
+ALTER TABLE users ADD COLUMN role VARCHAR(20) DEFAULT 'user';
+
 
 -- Switch to vehicle_db and create tables
 \connect vehicle_db

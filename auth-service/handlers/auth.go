@@ -2,7 +2,10 @@ package handlers
 
 import (
 	"database/sql"
+	"fmt"
+	"log"
 	"net/http"
+	"strings"
 
 	"github.com/Hritikpandey-ops/auth-service/models"
 	"github.com/Hritikpandey-ops/auth-service/utils"
@@ -20,14 +23,17 @@ func Signup(c *gin.Context) {
 		return
 	}
 
+	// Hash the password
 	hashedPassword, _ := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+
 	verificationToken := utils.GenerateVerificationToken()
 
+	role := "user"
 	err := database.DB.QueryRow(`
-		INSERT INTO users (email, password, verification_token)
-		VALUES ($1, $2, $3)
+		INSERT INTO users (email, password, verification_token, role)
+		VALUES ($1, $2, $3, $4)
 		RETURNING id`,
-		user.Email, string(hashedPassword), verificationToken,
+		user.Email, string(hashedPassword), verificationToken, role,
 	).Scan(&user.ID)
 
 	if err != nil {
@@ -38,7 +44,10 @@ func Signup(c *gin.Context) {
 	// Send email
 	go utils.SendVerificationEmail(user.Email, verificationToken)
 
-	c.JSON(http.StatusOK, gin.H{"message": "User created, please verify email", "user_id": user.ID})
+	c.JSON(http.StatusOK, gin.H{
+		"message": "User created, please verify your email",
+		"user_id": user.ID,
+	})
 }
 
 func VerifyEmail(c *gin.Context) {
@@ -60,7 +69,7 @@ func VerifyEmail(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"message": "Email verified successfully ✅"})
+	c.JSON(http.StatusOK, gin.H{"message": "Email verified successfully "})
 }
 
 func Login(c *gin.Context) {
@@ -72,8 +81,10 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	err := database.DB.QueryRow("SELECT id, password, is_verified FROM users WHERE email=$1", input.Email).
-		Scan(&dbUser.ID, &dbUser.Password, &dbUser.IsVerified)
+	err := database.DB.QueryRow(
+		"SELECT id, email, password, is_verified, role FROM users WHERE email=$1",
+		input.Email,
+	).Scan(&dbUser.ID, &dbUser.Email, &dbUser.Password, &dbUser.IsVerified, &dbUser.Role)
 
 	if err == sql.ErrNoRows {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "User not found"})
@@ -91,7 +102,8 @@ func Login(c *gin.Context) {
 		return
 	}
 
-	token, err := utils.GenerateJWT(input.Email)
+	token, err := utils.GenerateJWT(dbUser.Email, dbUser.Role)
+
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Error generating token"})
 		return
@@ -102,7 +114,13 @@ func Login(c *gin.Context) {
 
 // Get all users
 func GetAllUsers(c *gin.Context) {
-	rows, err := database.DB.Query(`SELECT id, email, is_verified FROM users`)
+	role, _ := c.Get("role")
+	if role != "admin" {
+		c.JSON(403, gin.H{"error": "Only admins can access this resource"})
+		return
+	}
+
+	rows, err := database.DB.Query(`SELECT id, email, is_verified, role FROM users`)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Failed to fetch users"})
 		return
@@ -112,11 +130,18 @@ func GetAllUsers(c *gin.Context) {
 	var users []models.User
 	for rows.Next() {
 		var user models.User
-		if err := rows.Scan(&user.ID, &user.Email, &user.IsVerified); err != nil {
+		if err := rows.Scan(&user.ID, &user.Email, &user.IsVerified, &user.Role); err != nil {
+			log.Println("Scan error:", err)
 			continue
 		}
 		users = append(users, user)
 	}
+
+	if err := rows.Err(); err != nil {
+		c.JSON(500, gin.H{"error": "Error reading users from database"})
+		return
+	}
+
 	c.JSON(200, users)
 }
 
@@ -124,8 +149,8 @@ func GetAllUsers(c *gin.Context) {
 func GetUserByID(c *gin.Context) {
 	id := c.Param("id")
 	var user models.User
-	err := database.DB.QueryRow(`SELECT id, email, is_verified FROM users WHERE id=$1`, id).Scan(
-		&user.ID, &user.Email, &user.IsVerified)
+	err := database.DB.QueryRow(`SELECT id, email, is_verified, role FROM users WHERE id=$1`, id).Scan(
+		&user.ID, &user.Email, &user.IsVerified, &user.Role)
 	if err != nil {
 		c.JSON(404, gin.H{"error": "User not found"})
 		return
@@ -137,19 +162,46 @@ func GetUserByID(c *gin.Context) {
 func UpdateUser(c *gin.Context) {
 	id := c.Param("id")
 	var input struct {
-		Email      string `json:"email"`
-		IsVerified bool   `json:"is_verified"`
+		Email      *string `json:"email"`
+		IsVerified *bool   `json:"is_verified"`
+		Role       *string `json:"role"`
 	}
+
 	if err := c.ShouldBindJSON(&input); err != nil {
 		c.JSON(400, gin.H{"error": "Invalid input"})
 		return
 	}
 
-	_, err := database.DB.Exec(`UPDATE users SET email=$1, is_verified=$2 WHERE id=$3`, input.Email, input.IsVerified, id)
+	query := "UPDATE users SET"
+	params := []interface{}{}
+	paramIndex := 1
+
+	if input.Email != nil {
+		query += fmt.Sprintf(" email=$%d,", paramIndex)
+		params = append(params, *input.Email)
+		paramIndex++
+	}
+	if input.IsVerified != nil {
+		query += fmt.Sprintf(" is_verified=$%d,", paramIndex)
+		params = append(params, *input.IsVerified)
+		paramIndex++
+	}
+	if input.Role != nil {
+		query += fmt.Sprintf(" role=$%d,", paramIndex)
+		params = append(params, *input.Role)
+		paramIndex++
+	}
+
+	query = strings.TrimSuffix(query, ",")
+	query += fmt.Sprintf(" WHERE id=$%d", paramIndex)
+	params = append(params, id)
+
+	_, err := database.DB.Exec(query, params...)
 	if err != nil {
 		c.JSON(500, gin.H{"error": "Failed to update user"})
 		return
 	}
+
 	c.JSON(200, gin.H{"message": "User updated"})
 }
 
@@ -167,7 +219,7 @@ func DeleteUser(c *gin.Context) {
 // Search users (by email)
 func SearchUsers(c *gin.Context) {
 	query := c.Query("q")
-	rows, err := database.DB.Query("SELECT id, email, is_verified FROM users WHERE email ILIKE '%' || $1 || '%'", query)
+	rows, err := database.DB.Query("SELECT id, email, is_verified, role FROM users WHERE email ILIKE '%' || $1 || '%'", query)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to search users"})
 		return
@@ -177,7 +229,7 @@ func SearchUsers(c *gin.Context) {
 	var users []models.User
 	for rows.Next() {
 		var user models.User
-		if err := rows.Scan(&user.ID, &user.Email, &user.IsVerified); err != nil {
+		if err := rows.Scan(&user.ID, &user.Email, &user.IsVerified, &user.Role); err != nil {
 			continue
 		}
 		users = append(users, user)

@@ -6,4 +6,5 @@ type User struct {
 	Password          string `json:"password,omitempty"`
 	IsVerified        bool   `json:"is_verified"`
 	VerificationToken string `json:"-"`
+	Role              string `json:"role"`
 }

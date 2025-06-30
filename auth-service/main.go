@@ -26,11 +26,13 @@ func main() {
 	api := r.Group("/api")
 	api.Use(middlewares.AuthMiddleware())
 	{
+		api.POST("/admin/register", middlewares.AdminOnly(), handlers.AdminRegister)
 		api.GET("/me", func(c *gin.Context) {
 			email, _ := c.Get("email")
 			c.JSON(200, gin.H{"message": "Authenticated", "email": email})
 		})
 
+		api.PUT("/users/:id/promote", handlers.PromoteToAdmin)
 		api.GET("/users", handlers.GetAllUsers)
 		api.GET("/users/:id", handlers.GetUserByID)
 		api.PUT("/users/:id", handlers.UpdateUser)

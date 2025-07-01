@@ -30,5 +30,34 @@ services:
     depends_on:
       - postgres
 
+  document-service:
+    build: ./document-service
+    ports:
+      - "8083:8083"
+    environment:
+      - MINIO_ENDPOINT=minio:9000        
+      - MINIO_ACCESS_KEY=minio
+      - MINIO_SECRET_KEY=minio123
+      - USE_SSL=false
+    depends_on:
+      - postgres
+      - minio
+
+
+  minio:
+    image: minio/minio
+    container_name: minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - MINIO_ROOT_USER=minio
+      - MINIO_ROOT_PASSWORD=minio123
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio-data:/data
+
 volumes:
   pgdata:
+  minio-data:
+

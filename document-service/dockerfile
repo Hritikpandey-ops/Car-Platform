@@ -1,0 +1,21 @@
+FROM golang:1.23.4-alpine
+
+WORKDIR /app
+
+# Install git & certificates (for fetching private/public modules)
+RUN apk add --no-cache git ca-certificates
+
+# Copy go.mod and go.sum first
+COPY go.mod go.sum ./
+
+# Download dependencies
+RUN go mod download
+
+# Copy the rest of the app
+COPY . .
+
+# Build the binary
+RUN go build -o document-service
+
+# Run the service
+CMD ["./document-service"]

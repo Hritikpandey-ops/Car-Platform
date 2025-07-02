@@ -59,6 +59,16 @@ services:
     volumes:
       - minio-data:/data
 
+  user-service:
+    build: ./user-service
+    ports:
+      - "8084:8084"
+    env_file:
+      - ./user-service/.env
+    depends_on:
+      - postgres
+
+
 volumes:
   pgdata:
   minio-data:

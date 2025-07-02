@@ -2,6 +2,7 @@
 CREATE DATABASE auth_db;
 CREATE DATABASE vehicle_db;
 CREATE DATABASE document;
+CREATE DATABASE user_db;
 
 -- ========================
 -- Schema for auth_db
@@ -45,3 +46,19 @@ CREATE TABLE documents (
   vehicle_id INT,
   uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+--=========================
+-- Schema Key Constraints
+--=========================
+\connect user_db
+
+CREATE TABLE user_profiles (
+    id SERIAL PRIMARY KEY,
+    user_id INT UNIQUE NOT NULL, -- maps to `users.id` in auth_db
+    full_name TEXT,
+    phone TEXT,
+    address TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+

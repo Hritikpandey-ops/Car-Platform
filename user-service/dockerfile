@@ -1,0 +1,21 @@
+# Start from the official Golang image
+FROM golang:1.23.4
+
+# Set working directory inside container
+WORKDIR /app
+
+# Copy go mod and sum files
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy the rest of the application code
+COPY . .
+
+# Build the Go app
+RUN go build -o user-service
+
+# Expose port
+EXPOSE 8084
+
+# Start the app
+CMD ["./user-service"]

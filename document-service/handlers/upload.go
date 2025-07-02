@@ -36,7 +36,7 @@ func UploadDocument(c *gin.Context) {
 		return
 	}
 
-	id, err := strconv.Atoi(vehicleIDStr)
+	vehicleID, err := strconv.Atoi(vehicleIDStr)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid vehicle_id"})
 		return
@@ -47,7 +47,8 @@ func UploadDocument(c *gin.Context) {
 	contentType := header.Header.Get("Content-Type")
 
 	// Upload to MinIO
-	_, err = utils.MinioClient.PutObject(context.Background(),
+	_, err = utils.MinioClient.PutObject(
+		context.Background(),
 		"documents",
 		objectName,
 		file,
@@ -61,14 +62,24 @@ func UploadDocument(c *gin.Context) {
 	}
 
 	// Save metadata to DB
-	document := models.Document{
-		Filename:    header.Filename,
-		URL:         objectName,
-		ContentType: contentType,
-		VehicleID:   id,
-	}
+	query := `INSERT INTO documents (filename, url, content_type, vehicle_id) 
+	          VALUES ($1, $2, $3, $4) RETURNING id`
 
-	if err := models.DB.Create(&document).Error; err != nil {
+	var document models.Document
+	document.Filename = header.Filename
+	document.URL = objectName
+	document.ContentType = contentType
+	document.VehicleID = vehicleID
+
+	err = models.DB.QueryRow(
+		query,
+		document.Filename,
+		document.URL,
+		document.ContentType,
+		document.VehicleID,
+	).Scan(&document.ID)
+
+	if err != nil {
 		log.Println("Database insert error:", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save document record"})
 		return

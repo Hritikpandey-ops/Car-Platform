@@ -34,6 +34,8 @@ services:
     build: ./document-service
     ports:
       - "8083:8083"
+    env_file:
+      - ./document-service/.env
     environment:
       - MINIO_ENDPOINT=minio:9000        
       - MINIO_ACCESS_KEY=minio

@@ -1,38 +1,40 @@
 package models
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"os"
 	"time"
 
-	"gorm.io/driver/postgres"
-	"gorm.io/gorm"
+	_ "github.com/lib/pq"
 )
 
-var DB *gorm.DB
+var DB *sql.DB
 
-func ConnectDatabase() {
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable",
+func Connect() {
+	dsn := fmt.Sprintf(
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
 		os.Getenv("DB_HOST"),
+		os.Getenv("DB_PORT"),
 		os.Getenv("DB_USER"),
 		os.Getenv("DB_PASSWORD"),
 		os.Getenv("DB_NAME"),
-		os.Getenv("DB_PORT"),
 	)
 
 	var err error
-	for i := 0; i < 10; i++ {
-		DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	for i := 1; i <= 10; i++ {
+		DB, err = sql.Open("postgres", dsn)
 		if err == nil {
-			break
+			err = DB.Ping()
+			if err == nil {
+				log.Println("Document DB connected")
+				return
+			}
 		}
-		log.Printf("Failed to connect to database. Retrying in 5s... (%d/10)", i+1)
-		time.Sleep(5 * time.Second)
-	}
-	if err != nil {
-		log.Fatalf("Could not connect to database after 10 attempts: %v", err)
+		log.Printf("Retrying Document DB connection... (%d/10)\n", i)
+		time.Sleep(2 * time.Second)
 	}
 
-	DB.AutoMigrate(&Document{})
+	log.Fatalf("Document DB unreachable after retries: %v", err)
 }

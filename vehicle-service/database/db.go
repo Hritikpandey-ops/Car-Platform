@@ -27,7 +27,7 @@ func Connect() {
 		if err == nil {
 			err = DB.Ping()
 			if err == nil {
-				log.Println("🚗 Vehicle DB connected")
+				log.Println("Vehicle DB connected")
 				return
 			}
 		}

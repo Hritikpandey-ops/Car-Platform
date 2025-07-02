@@ -1,93 +1,160 @@
-# Auth Service – Microservice for Authentication
+#   Car Platform – Microservices Architecture
 
-This is the **Auth Service** component of a microservices-based vehicle platform built using **Go (Golang)** and **Docker**. It handles user authentication and account management functionality such as signup, login, email verification, and JWT-based protected routes.
+This project is a microservices-based backend system built with Go, Docker, and PostgreSQL. It supports modular, scalable components for a car-related platform such as user authentication, vehicle management, document handling, and user profiling.
 
 ---
 
-## Features
+##   Services Implemented
 
-- **User Signup** with hashed password storage (bcrypt)
-- **Login** with JWT token generation
-- **Email Verification** via secure token
-- **JWT Middleware** to protect internal routes
-- **PostgreSQL** as the database
-- Containerized with **Docker & Docker Compose**
+### 1. **Auth Service (`auth-service`)**
+Handles user registration, login, and JWT authentication.
+
+-    Endpoints:
+  - `POST /register` – Register a new user.
+  - `POST /login` – Authenticate a user and return a JWT.
+  - `GET /api/me` – Token verification endpoint.
+-    Role-Based Access Control (RBAC): Supports `user`, `admin`.
+
+---
+
+### 2. **Vehicle Service (`vehicle-service`)**
+CRUD operations for vehicle data, secured by token verification through `auth-service`.
+
+-    Endpoints:
+  - `POST /vehicles` – Add a vehicle.
+  - `GET /vehicles` – List all vehicles.
+  - `GET /vehicles/:id` – Get vehicle by ID.
+  - `PATCH /vehicles/:id` – Update vehicle.
+  - `DELETE /vehicles/:id` – Delete vehicle.
+
+-   Middleware:
+  - Token verification by calling `auth-service`'s `/api/me`.
+
+---
+
+### 3. **Document Service (`document-service`)**
+Handles uploading and associating documents (e.g., RCs, images) with vehicles. Stores files in **MinIO** and metadata in **PostgreSQL**.
+
+-    Endpoints:
+  - `POST /documents/upload` – Upload a file.
+  - `GET /documents/vehicle/:id` – Get docs for a vehicle.
+  - `PATCH /documents/:id` – Update doc metadata.
+  - `DELETE /documents/:id` – Delete a document.
+
+-  MinIO is used as object storage.
+-  JWT token verification via `auth-service`.
+
+---
+
+### 4. **User Service (`user-service`)**
+Handles user profile management. Auth data (email/password) is stored in `auth-service`, while additional profile details are managed here.
+
+-  Endpoints:
+  - `POST /users` – Create a user profile.
+  - `GET /users` – Get all profiles.
+  - `GET /users/:id` – Get a specific user profile.
+  - `PATCH /users/:id` – Update profile.
+  - `DELETE /users/:id` – Delete profile.
 
 ---
 
 ## Tech Stack
 
-- **Language**: Go (Golang)
-- **Web Framework**: Gin
-- **Database**: PostgreSQL
-- **Token Handling**: JWT
-- **Email Delivery**: SMTP (Gmail App Password)
-- **Containerization**: Docker & Docker Compose
+| Tech            | Description                            |
+|-----------------|----------------------------------------|
+| Go              | Programming language for all services  |
+| Gin             | Web framework                          |
+| PostgreSQL      | Relational DB                          |
+| MinIO           | Object storage                         |
+| Docker          | Containerization                       |
+| Docker Compose  | Multi-service orchestration            |
+| JWT             | Token-based authentication             |
 
 ---
 
-## Project Structure
-auth-service/
-├── Dockerfile
-├── .env
-├── main.go
-├── handlers/
-│ └── auth.go
-├── models/
-│ └── user.go
-├── database/
-│ └── connect.go
-├── utils/
-│ ├── jwt.go
-│ └── email.go
-├── init.sql
+##  Database Design
 
----
+### `auth-service` – `auth_db.users`
+```sql
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  password TEXT NOT NULL,
+  is_verified BOOLEAN DEFAULT FALSE,
+  verification_token TEXT,
+  role VARCHAR(20) DEFAULT 'user'
+);
 
-## Getting Started
-
-1. **Clone the repo**
-   ```bash
-   git clone https://github.com/Hritikpandey-ops/car-platform.git
-   cd car-platform
-
-Create a .env file in auth-service/:
-DB_HOST=postgres
-DB_PORT=5432
-DB_USER=postgres
-DB_PASSWORD=yourpassword
-DB_NAME=auth_db
-
-JWT_SECRET=your_jwt_secret
-
-EMAIL_FROM=your_email@gmail.com
-EMAIL_PASSWORD=your_app_password
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
+-- vehicle service – vehicle_db.vehicles
+sql
+CREATE TABLE vehicles (
+  id SERIAL PRIMARY KEY,
+  brand TEXT NOT NULL,
+  model TEXT NOT NULL,
+  year INT NOT NULL,
+  color TEXT NOT NULL,
+  registration_number TEXT NOT NULL
+);
 
 
-Start services with Docker
-## docker-compose up --build
+-- document-service – vehicle_db.documents
+sql
+CREATE TABLE documents (
+  id SERIAL PRIMARY KEY,
+  filename TEXT NOT NULL,
+  url TEXT NOT NULL,
+  content_type TEXT NOT NULL,
+  vehicle_id BIGINT,
+  uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
 
-Test API Endpoints using Postman
-## POST /signup
-## GET /verify?token=...
-## POST /login
-## GET /api/me (with JWT)
-
-## Next Up
-Plan is to add more microservices like:
-
- vehicle-service
-
- media-service (upload car photos)
-
- valuation-service (estimate car value)
-
- Admin & verification dashboards
+-- user-service – user_db.users
+sql
+CREATE TABLE users (
+  id SERIAL PRIMARY KEY,
+  email TEXT UNIQUE NOT NULL,
+  full_name TEXT,
+  phone TEXT,
+  address TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
 
-## Author
-Hritik Pandey
-GitHub: @Hritikpandey-ops
+
+##  Docker Setup
+Run all services: bash
+docker-compose up --build
+
+
+Services & Ports:
+Service	Port
+Auth Service	   8081
+Vehicle Service	8082
+Document Service	8083
+User Service	   8084
+PostgreSQL	      5432
+MinIO	9000 (API), 9001 (Console)
+
+## Authentication
+All protected services (vehicle, document, user) verify tokens using: http
+
+GET http://auth-service:8081/api/me
+Authorization: Bearer <token>
+
+-- Testing
+Use Postman or cURL to test endpoints. Include the JWT token in the Authorization header when required.
+
+-- To Do (Next Steps)
+ Implement Mail Service for sending verification emails.
+
+ Add Admin Service for moderation & analytics.
+
+ Integrate API Gateway (e.g., NGINX or Kong).
+
+ Add Swagger / OpenAPI docs.
+
+ Write unit & integration tests.
+
+-- Author
+Hritik Lalji Pandey

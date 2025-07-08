@@ -68,6 +68,13 @@ services:
     depends_on:
       - postgres
 
+  mail-service:
+    build: ./mail-service
+    ports:
+      - "8085:8085"
+    env_file:
+      - ./mail-service/.env
+
 
 volumes:
   pgdata:
